@@ -40,16 +40,33 @@ std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, fl
 
 InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrinessX,
                                                float blurrinessY, const Color& color,
-                                               bool shadowOnly)
+                                               bool shadowOnly, float spread)
 
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
-      shadowOnly(shadowOnly) {
+      shadowOnly(shadowOnly), spread(spread) {
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  auto allocator = args.context->drawingAllocator();
+  auto sourceWidth = static_cast<float>(source->width());
+  auto sourceHeight = static_cast<float>(source->height());
+
+  if (spread > 0.0f && (2.0f * spread >= sourceWidth || 2.0f * spread >= sourceHeight)) {
+    auto dstColor = ToPMColor(color, source->colorSpace());
+    return ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
+  }
+
+  auto shadowMatrix = Matrix::I();
+  if (spread > 0.0f) {
+    auto scaleX = sourceWidth / (sourceWidth - 2.0f * spread);
+    auto scaleY = sourceHeight / (sourceHeight - 2.0f * spread);
+    shadowMatrix.postTranslate(-sourceWidth * 0.5f, -sourceHeight * 0.5f);
+    shadowMatrix.postScale(scaleX, scaleY);
+    shadowMatrix.postTranslate(sourceWidth * 0.5f, sourceHeight * 0.5f);
+  }
+  shadowMatrix.postTranslate(-dx, -dy);
   if (uvMatrix) {
     shadowMatrix.preConcat(*uvMatrix);
   }
@@ -63,7 +80,6 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
                                                sampling, constraint, &shadowMatrix);
   }
 
-  auto allocator = args.context->drawingAllocator();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
         ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);

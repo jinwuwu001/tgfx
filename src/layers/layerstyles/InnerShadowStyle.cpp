@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "core/filters/InnerShadowImageFilter.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
 std::shared_ptr<InnerShadowStyle> InnerShadowStyle::Make(float offsetX, float offsetY,
                                                          float blurrinessX, float blurrinessY,
                                                          const Color& color) {
-
   return std::shared_ptr<InnerShadowStyle>(
       new InnerShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color));
 }
@@ -68,6 +69,14 @@ void InnerShadowStyle::setColor(const Color& color) {
   invalidateFilter();
 }
 
+void InnerShadowStyle::setSpread(float spread) {
+  if (_spread == spread) {
+    return;
+  }
+  _spread = spread;
+  invalidateFilter();
+}
+
 InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrinessX,
                                    float blurrinessY, const Color& color)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
@@ -75,6 +84,7 @@ InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrines
 }
 
 Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
+  // Spread does not affect bounds because inner shadow is always clipped to the layer footprint.
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return srcRect;
@@ -82,13 +92,16 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              const Point& /*contentOffset*/, float alpha, BlendMode blendMode) {
-  auto filter = getShadowFilter(contentScale);
+void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleDrawSource& source, float alpha,
+                              BlendMode blendMode) {
+  auto filter = getShadowFilter(source.contentScale);
   if (!filter) {
     return;
   }
-  content = content->makeWithFilter(filter);
+  auto content = source.content->makeWithFilter(filter);
+  if (!content) {
+    return;
+  }
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
@@ -99,7 +112,7 @@ void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, fl
   if (_blurrinessX == 0 && _blurrinessY == 0) {
     sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
   }
-  canvas->drawImage(content, sampling, &paint);
+  canvas->drawImage(content, 0, 0, sampling, &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
@@ -107,8 +120,10 @@ std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
     return shadowFilter;
   }
 
-  shadowFilter = ImageFilter::InnerShadowOnly(_offsetX * scale, _offsetY * scale,
-                                              _blurrinessX * scale, _blurrinessY * scale, _color);
+  shadowFilter = std::make_shared<InnerShadowImageFilter>(_offsetX * scale, _offsetY * scale,
+                                                          _blurrinessX * scale,
+                                                          _blurrinessY * scale, _color, true,
+                                                          _spread * scale);
   currentScale = scale;
 
   return shadowFilter;

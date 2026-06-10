@@ -24,13 +24,14 @@ namespace tgfx {
 class InnerShadowImageFilter : public ImageFilter {
  public:
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
-                         const Color& color, bool shadowOnly);
+                         const Color& color, bool shadowOnly, float spread = 0.0f);
 
   float dx = 0.0f;
   float dy = 0.0f;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;
   Color color = Color::Black();
   bool shadowOnly = false;
+  float spread = 0.0f;
 
  protected:
   Type type() const override {

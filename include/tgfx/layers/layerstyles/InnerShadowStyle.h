@@ -97,18 +97,36 @@ class InnerShadowStyle : public LayerStyle {
    */
   void setColor(const Color& color);
 
+  /**
+   * The spread distance for the inner shadow. A positive value expands the shadow inward by scaling
+   * the sampling coordinates, making the shadow region larger. The unit is in the layer's local
+   * coordinate space.
+   */
+  float spread() const {
+    return _spread;
+  }
+
+  /**
+   * Sets the geometric inset / outset distance.
+   */
+  void setSpread(float spread);
+
   LayerStylePosition position() const override {
     return LayerStylePosition::Above;
   }
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
+  bool needContentShape() const override {
+    return false;
+  }
+
  private:
   InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color);
 
-  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-              const Point& contentOffset, float alpha, BlendMode blendMode) override;
+  void onDraw(Canvas* canvas, const LayerStyleDrawSource& source, float alpha,
+              BlendMode blendMode) override;
 
   std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 
@@ -121,5 +139,6 @@ class InnerShadowStyle : public LayerStyle {
   Color _color = Color::Black();
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
   float currentScale = 0.0f;
+  float _spread = 0.0f;
 };
 }  // namespace tgfx
