@@ -160,6 +160,7 @@ jobs:
           cd web
           source emsdk/emsdk_env.sh
           npm run build:st
+          npm run build:webgpu
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
